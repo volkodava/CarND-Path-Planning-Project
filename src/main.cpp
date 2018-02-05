@@ -10,6 +10,13 @@
 #include "json.hpp"
 #include "spline.h"
 
+static const int LANE_WIDTH = 4;
+static const int CAR_SAFE_BUFFER = 30;
+static const int CAR_SAFE_TURN_BUFFER = 30;
+static const double CAR_MAX_SPEED = 49.5;
+static const double CAR_SPEED_UP = 0.224;
+static const double CAR_SLOW_DOWN = 0.224;
+
 using namespace std;
 
 // for convenience
@@ -253,42 +260,82 @@ int main() {
 
           bool too_close = false;
 
-          // find ref_v to use
+          vector<bool> free_lanes = {true, true, true};
+          free_lanes[lane] = false;
+
+          // locate cars around using sensors
           for (int i = 0; i < sensor_fusion.size(); i++)
           {
-            // car is in my lane
             float d = sensor_fusion[i][6];
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double check_speed = sqrt(vx*vx + vy*vy);
+            double check_car_s = sensor_fusion[i][5];
 
-            if ((d < (2 + 4*lane + 2)) && (d > (2 + 4 * lane - 2))) {
-              double vx = sensor_fusion[i][3];
-              double vy = sensor_fusion[i][4];
-              double check_speed = sqrt(vx*vx + vy*vy);
-              double check_car_s = sensor_fusion[i][5];
+            int check_lane;
+            if (d > 0 && d < LANE_WIDTH)
+            {
+                check_lane = 0;
+            }
+            else if (d > LANE_WIDTH && d < 2 * LANE_WIDTH)
+            {
+                check_lane = 1;
+            }
+            else
+            {
+                check_lane = 2;
+            }
 
-              // if using previous points can project s value out
-              check_car_s += ((double) prev_size * .02 * check_speed);
-              if ((check_car_s > car_s) && ((check_car_s - car_s) < 30)) {
+            check_car_s += ((double) prev_size * .02 * check_speed);
+
+            bool car_ahead = (check_lane == lane);
+            bool risky_distance = (check_car_s > car_s && (check_car_s - car_s) < CAR_SAFE_BUFFER);
+            if (car_ahead && risky_distance)
+            {
+                // if car ahead and in risky zone
                 too_close = true;
-              }
+            }
+
+            bool car_higher_speed = (check_speed > car_speed);
+            bool no_space = ((check_car_s - car_s) > -CAR_SAFE_TURN_BUFFER && (check_car_s - car_s) < CAR_SAFE_TURN_BUFFER);
+            if (car_higher_speed || no_space)
+            {
+              free_lanes[check_lane] = false;
             }
           }
 
+//          cout << "[DEBUG] Open lanes:" << endl;
+//          for (vector<bool>::iterator it = free_lanes.begin(); it != free_lanes.end(); ++it) {
+//            cout << *it << " ";
+//          }
+//          cout << endl;
+
           if (too_close)
           {
-            ref_vel -= 0.224;
+            // lane for high speed preferable
+            if (lane - 1 >= 0 && free_lanes[lane - 1])
+            {
+              lane -= 1;
+            }
+            else if (lane + 1 < free_lanes.size() && free_lanes[lane + 1])
+            {
+              lane += 1;
+            }
+            else
+            {
+              ref_vel -= CAR_SLOW_DOWN;
+            }
           }
-          else if (ref_vel < 49.5)
+          else if (ref_vel < CAR_MAX_SPEED)
           {
-            ref_vel += 0.224;
+            ref_vel += CAR_SPEED_UP;
           }
 
-          // Create a list of widely spaced (x, y) waypoints, evenly spaced at 30m
-          // Later we will interpolate these waypoints with a spline and fill it in with more points that control speed.
+          // list of 30m spaced (x, y) waypoints
           vector<double> ptsx;
           vector<double> ptsy;
 
           // reference x, y, yaw states
-          // either we will reference the starting point as where the car is or at the previous paths end point.
           double ref_x = car_x;
           double ref_y = car_y;
           double ref_yaw = deg2rad(car_yaw);
