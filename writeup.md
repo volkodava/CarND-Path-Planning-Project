@@ -43,6 +43,7 @@ Scenarios handled with next routine:
 
 # Model Documentation
 
+Most of the code used from `Project Walkthrough and Q&A` section.
 To build a smooth line between a waypoints we do use spline function. After we applied spline function 
 we use generated points to feed back into simulator to generate trajectory for our car to follow. 
 We know that every `20 ms` (`0.02`) the car moves to the next point on trajectory, 
