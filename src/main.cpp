@@ -12,10 +12,8 @@
 
 static const int LANE_WIDTH = 4;
 static const int CAR_SAFE_BUFFER = 30;
-static const int CAR_SAFE_TURN_BUFFER = 30;
 static const double CAR_MAX_SPEED = 49.5;
-static const double CAR_SPEED_UP = 0.224;
-static const double CAR_SLOW_DOWN = 0.224;
+static const double CAR_ACCELERATION = 0.224;
 
 using namespace std;
 
@@ -297,7 +295,7 @@ int main() {
             }
 
             bool car_higher_speed = (check_speed > car_speed);
-            bool no_space = ((check_car_s - car_s) > -CAR_SAFE_TURN_BUFFER && (check_car_s - car_s) < CAR_SAFE_TURN_BUFFER);
+            bool no_space = ((check_car_s - car_s) > -CAR_SAFE_BUFFER && (check_car_s - car_s) < CAR_SAFE_BUFFER);
             if (car_higher_speed || no_space)
             {
               free_lanes[check_lane] = false;
@@ -323,12 +321,12 @@ int main() {
             }
             else
             {
-              ref_vel -= CAR_SLOW_DOWN;
+              ref_vel -= CAR_ACCELERATION;
             }
           }
           else if (ref_vel < CAR_MAX_SPEED)
           {
-            ref_vel += CAR_SPEED_UP;
+            ref_vel += CAR_ACCELERATION;
           }
 
           // list of 30m spaced (x, y) waypoints
